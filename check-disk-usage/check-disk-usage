@@ -359,7 +359,6 @@ doCheck() {
             message+=$'\n- **'"$target"':** `'"$usage_percent"'%`'
             over_usage="true"
         fi
-        message+=$'\n- **'"$target"':** `'"$usage_percent"'%`'
     else
         readTargetConf "$target_file"
         count=$((1))
