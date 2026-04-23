@@ -1,2 +1,2 @@
 ## S'ha detetectat un ús elevat de disc
-### Servidors afectats (% d'ús de disc)
+### Servidor(s) afectat(s) (% d'ús de disc)
