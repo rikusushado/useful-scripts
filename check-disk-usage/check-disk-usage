@@ -356,8 +356,8 @@ doCheck() {
         usage_percent=${usage_percent:: -1}
 
         if (( usage_percent >= 80 )) ; then
-            over_usage=true
-            exit
+            message+=$'\n- **'"$target"':** `'"$usage_percent"'%`'
+            over_usage="true"
         fi
         message+=$'\n- **'"$target"':** `'"$usage_percent"'%`'
     else
@@ -386,7 +386,7 @@ doCheck() {
             usage_percent=$( echo "${output}" | grep -E -o "[[:digit:]]{1,3}%" | sed 's/%$//')
 
 
-            if (( usage_percent >= 10 )) ; then
+            if (( usage_percent >= 80 )) ; then
                     message+=$'\n- **'"$tag"':** `'"$usage_percent"'%`'
                     over_usage="true"
             fi
