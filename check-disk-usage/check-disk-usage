@@ -1,8 +1,9 @@
 #!/bin/bash
 
 ## Value predefinition
-requirements=("ssh" "sshpass" "curl")
-app_conf_file=/usr/local/conf/check-disk-usage.ini
+requirements=("ssh" "sshpass" "wget")
+default_conf_file="/usr/local/conf/check-disk-usage/default.ini"
+chat_conf_file="/usr/local/conf/check-disk-usage/chat.ini"
 
 
 
@@ -31,63 +32,24 @@ app_conf_file=/usr/local/conf/check-disk-usage.ini
 ##     MAIN FUNCTION SECTION     ##
 ###################################
 
-prepareEnviroment() {
-    missing_apps=()
-    for command in "${requirements[@]}" ; do
-        if ! command -v "$command">/dev/null 2>&1 ; then
-            missing_apps+=("$command")
-        fi
-    done
-
-    if [ ! -z "${missing_apps[*]}" ]; then 
-        if [[ $(id -u) -ne 0 ]]; then 
-            echo "Error: Aplication(s)${missing_apps[*]} not found: You need may to run as root to install them"
-            exit
-        fi
-
-        apt install "${missing_apps[@]}" -y
-    fi
-
-    log_dir="/var/log/check-disk-usage/"
-
-    if [ ! -d "$log_dir" ] ; then 
-        if [[ $(id -u) -ne 0 ]]; then 
-            echo "Error: Directory $log_dir not found: You may need to run as root to create it"
-            exit
-        fi
-        mkdir "$log_dir"
-    fi
-
-
-    app_conf_dir="/usr/local/conf/"
-
-    if [ ! -d "$app_conf_dir" ] ; then 
-        if [[ $(id -u) -ne 0 ]]; then 
-            echo "Error: Directory $app_conf_dir not found: You may need to run as root to create it"
-            exit
-        fi
-        mkdir "$app_conf_dir"
-    fi
-}
-
 doInstall() {
     if [ "$1" != "reinstall" ] ; then
         if [[ ! -z $(which check-disk-usage) ]] ; then
-            echo "Script already installed!"
+            echo -e "Script already installed!\n"
             exit
         fi
     fi
 
     if [[ $(id -u) -ne 0 ]]; then 
-        echo "Please, run as root if you want to $1"
+        echo -e "Please, run as root if you want to $1\n"
         exit
     fi
 
     path_dir="/usr/local/bin/"
     script_file="$path_dir/check-disk-usage"
-    touch "$script_file"
+    touch "$script_file"sudo 
     IFS=$'\n' read -d '' -r -a lines < "$0"
-    portable_script=( "${lines[@]::52}" "${lines[@]:82:14}" "${lines[@]:100}")
+    portable_script=("${lines[@]::5}" "${lines[@]:52:14}" "${lines[@]:70}")
     installed_script=$(printf "%s\n" "${portable_script[@]}")
     echo "$installed_script" > "$script_file"
     chmod 777 "$script_file"
@@ -131,6 +93,9 @@ readArguments() {
         elif echo "$arg" | grep -q "\-l=" ; then
             language="${arg:3}"
 
+        elif echo "$arg" | grep -q "\--no-conf" ; then
+            use_conf="false"
+
         else
             echo -e "Unknown argument: $arg\nskipping..."
         fi
@@ -139,11 +104,119 @@ readArguments() {
     return 0;
 }
 
+prepareEnviroment() {
+    missing_apps=()
+    for command in "${requirements[@]}" ; do
+        if ! command -v "$command">/dev/null 2>&1 ; then
+            missing_apps+=("$command")
+        fi
+    done
+
+    if [ ! -z "${missing_apps[*]}" ]; then 
+        if [[ $(id -u) -ne 0 ]]; then 
+            echo -e "Error: Aplication(s)${missing_apps[*]} not found: You may need to run as root to install them\n"
+            exit
+        fi
+
+        apt install "${missing_apps[@]}" -y
+    fi
+
+    log_dir="/var/log/check-disk-usage/"
+
+    if [ ! -d "$log_dir" ] ; then 
+        if [[ $(id -u) -ne 0 ]]; then 
+            echo -e "Error: Directory $log_dir not found: You may need to run as root to create it\n"
+            exit
+        fi
+        mkdir "$log_dir"
+    fi
+
+
+    app_conf_dir="/usr/local/conf/check-disk-usage/"
+
+    if [ ! -d "$app_conf_dir" ] ; then 
+        if [[ $(id -u) -ne 0 ]]; then 
+            echo -e "Error: Directory $app_conf_dir not found: You may need to run as root to create it\n"
+            exit
+        fi
+        mkdir "$app_conf_dir"
+    fi
+
+    required_conf_files=( "default.ini" )
+
+    raw_url_dir="https://raw.githubusercontent.com/rikusushado/useful-scripts/refs/heads/main/check-disk-usage"
+
+    for file in "${required_conf_files[@]}" ; do
+        if [ ! -f "$app_conf_dir/$file" ]; then   
+            not_found+=( "$file" )
+        fi
+    done
+
+    if (( ${#not_found[@]} != 0 )) ; then
+        if [[ $(id -u) -ne 0 ]]; then 
+            echo -e "Error: Config file(s) ${not_found[*]} not found: You may need to run as root to download it\n"
+            exit
+        fi
+
+        for file in "${not_found[@]}" ; do
+            wget "$raw_url_dir/$file" \
+            -O "$app_conf_dir/$file"
+        done
+    fi
+
+
+    basic_lang_files=( "en/check-disk-usage/heading.md" 
+    "es/check-disk-usage/heading.md"
+    "cat/check-disk-usage/heading.md" )
+
+    for file in "${basic_lang_files[@]}" ; do
+        if [ -f "/var/lang/$file" ]; then 
+            found_single_file="true"
+        fi
+    done
+
+    if [ "$found_single_file" != "true" ] ; then
+        if [[ $(id -u) -ne 0 ]]; then 
+            echo -e "Error: No language packages found: You may want to run as root to install one of your preference\n"
+            exit
+        fi
+
+        echo "Which language package would you like to install?"
+        echo "None    (0)"
+        echo "English (1)"
+        echo "Español (2)"
+        echo "Català  (3)"
+
+        read -p $'\nPlease select an option form 0-3: ' chosen
+
+        lang_array=( "none" "en" "es" "cat" )
+
+        lang_file="check-disk-usage/heading.md"
+
+        if (( chosen != 0 )) ; then
+            echo "${lang_array[$chosen]}"
+
+            mkdir -p "/var/lang/${lang_array[$chosen]}/check-disk-usage"
+
+            wget "$raw_url_dir/lang/${lang_array[$chosen]}/$lang_file" \
+            -O "/var/lang/${lang_array[$chosen]}/$lang_file"
+        else
+            echo -e "\nNone selected, exiting app..."
+            exit
+        fi
+    fi
+}
+
 rmFirst() {
     awk '{for (i=2; i<NF; i++) printf $i " "; print $NF}' <<< "$1"
 }
 
 readTargetConf() {
+    if [ ! -f "$1" ]; then   
+        echo -e "Error: Target conf file not found\n"
+        exit
+    fi
+
     readarray -t config < "$1"
     config+=( 'EOF' )
 
@@ -164,7 +237,7 @@ readTargetConf() {
             target_switch=$((1))
 
         elif [ ! "$line" = "" ] ; then
-            echo "Error: Invalid conf argument: $line"
+            echo -e "Error: Invalid conf argument: $line\n"
         fi
         if [ "$t" = "localhost"  ] ; then
             p=0
@@ -186,6 +259,10 @@ readTargetConf() {
 }
 
 manageDefaultConf() {
+    if [ ! -f "$1" ]; then   
+        echo -e "Error: Defaut conf file not found\n"
+        exit
+    fi
     readarray -t config < "$1"
 
     for line in "${config[@]}" ; do
@@ -202,29 +279,29 @@ manageDefaultConf() {
             target_file=$(rmFirst "$line")
 
         elif [ ! "$line" = "" ] ; then
-            echo "Error: Invalid conf argument: $line"
+            echo -e "Error: Invalid conf argument: $line \n"
 
         fi
     done
 }
 
-readAppConf() {
+readChatConf() {
     readarray -t config < "$1"
 
     for line in "${config[@]}" ; do
         if echo "$line"  | grep -q "email" ; then
-            zulip_email=$(rmFirst "$line")
+            chat_email=$(rmFirst "$line")
         elif echo "$line"  | grep -q "key" ; then
-            zulip_key=$(rmFirst "$line")
+            chat_key=$(rmFirst "$line")
         elif echo "$line"  | grep -q "url" ; then
-            zulip_url=$(rmFirst "$line")
+            chat_url=$(rmFirst "$line")
         elif echo "$line"  | grep -q "stream" ; then
-            zulip_stream=$(rmFirst "$line")
+            chat_stream=$(rmFirst "$line")
         elif echo "$line"  | grep -q "topic" ; then
-            zulip_topic=$(rmFirst "$line")
+            chat_topic=$(rmFirst "$line")
 
         elif ! grep -Eq "\[*\]" <<< "$line" ; then
-            echo "Error: Invalid conf argument: $line"
+            echo -e "Error: Invalid conf argument: $line\n"
         fi
     done
 }
@@ -250,28 +327,29 @@ useLangSet() {
 
 doCheck() {
     if [ "$use_conf" = "false" ] ; then
-        if $use_ssh ; then
+        if [ "$use_ssh" = "true" ] ; then
             if [ -z "$target" ] ; then
-                echo -e "Warning: Target arg emtpy, using default target..."
+                echo -e "Warning: Target arg emtpy, using default target...\n"
                 target="localhost"
             fi
             if [ -z "$password" ] ; then
-                echo -e "Error: Password cannot be empty!"
+                echo -e "Error: Password cannot be empty!\n"
                 exit
             fi
             if [ -z "$user" ] ; then
-                echo -e "Error: User cannot be empty!"
+                echo -e "Error: User cannot be empty!\n"
                 exit
             fi
             if [ -z "$ssh_port" ] ; then
-                echo -e "Warning: SSH port arg empty, using default port..."
+                echo -e "Warning: SSH port arg empty, using default port...\n"
                 ssh_port=22
             fi
 
             output="$(sshpass -p "$password" ssh -o StrictHostKeyChecking=no -l "$user" "$target" -p "$ssh_port" "df -h /")"
 
         else
-            output="$(df -h /)"    
+            output="$(df -h /)"
+            target="localhost"    
         fi
 
         usage_percent=$( echo "${output}" | grep -E -o "[[:digit:]]{1,3}%" )
@@ -308,24 +386,23 @@ doCheck() {
             usage_percent=$( echo "${output}" | grep -E -o "[[:digit:]]{1,3}%" | sed 's/%$//')
 
 
-            if (( usage_percent >= 80 )) ; then
+            if (( usage_percent >= 10 )) ; then
                     message+=$'\n- **'"$tag"':** `'"$usage_percent"'%`'
                     over_usage="true"
             fi
             count=$(( count + 1 ))
         done
     fi
-    echo "$message"
 }
 
 sendMessage() { 
     if $over_usage ; then
-        curl -s -u "$zulip_email:$zulip_key" \
+        curl -s -u "$chat_email:$chat_key" \
         -d "type=stream" \
-        -d "to=$zulip_stream" \
-        -d "topic=$zulip_topic" \
+        -d "to=$chat_stream" \
+        -d "topic=$chat_topic" \
         --data-binary 'content='"$message"'' \
-        "$zulip_url/api/v1/messages"
+        "$chat_url/api/v1/messages"
     fi
 }
 
@@ -334,9 +411,9 @@ doLogging() {
 }
 
 prepareEnviroment
+manageDefaultConf "$default_conf_file"
 readArguments "$@"
-manageDefaultConf "/etc/default/check-disk-usage.conf"
-readAppConf "$app_conf_file"
+readChatConf "$chat_conf_file"
 useLangSet
 doCheck
 sendMessage
