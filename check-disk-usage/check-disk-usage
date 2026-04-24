@@ -128,7 +128,7 @@ prepareEnviroment() {
             echo -e "Error: Directory $log_dir not found: You may need to run as root to create it\n"
             exit
         fi
-        mkdir "$log_dir"
+        mkdir -p "$log_dir"
     fi
 
 
@@ -139,7 +139,7 @@ prepareEnviroment() {
             echo -e "Error: Directory $app_conf_dir not found: You may need to run as root to create it\n"
             exit
         fi
-        mkdir "$app_conf_dir"
+        mkdir -p "$app_conf_dir"
     fi
 
     required_conf_files=( "default.ini" )
