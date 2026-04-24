@@ -395,7 +395,7 @@ doCheck() {
 }
 
 sendMessage() { 
-    if [ $over_usage = "true" ] ; then
+    if [ "$over_usage" = "true" ] ; then
         curl -s -u "$chat_email:$chat_key" \
         -d "type=stream" \
         -d "to=$chat_stream" \
